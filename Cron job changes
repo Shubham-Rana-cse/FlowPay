@@ -1,0 +1,9 @@
+## Cron job changes for Vercel Hobby plan
+
+This project is designed to run the following cron jobs:
+
+- Payment Retry: Every 5 minutes
+- Webhook Retry: Every 5 minutes
+- Settlement: Daily at 02:00 UTC
+
+Since Vercel Hobby only allows a daily cron job, the schedules in `vercel.json` have been adjusted for deployment. During demonstrations, the cron endpoints are triggered manually to simulate production behavior.
