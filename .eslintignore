@@ -1,0 +1,7 @@
+cat > .eslintignore << 'EOF'
+node_modules
+.next
+dist
+build
+src/generated
+EOF
