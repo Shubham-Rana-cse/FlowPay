@@ -67,3 +67,6 @@ coverage/
 # ==========================
 *.tmp
 *.temp
+
+AGENTS.md
+CLAUDE.md
