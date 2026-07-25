@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <p className="font-mono text-xs tracking-widest text-muted uppercase">
-            Payment Orchestrator
+            FlowPay
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-foreground">Log in</h1>
         </div>

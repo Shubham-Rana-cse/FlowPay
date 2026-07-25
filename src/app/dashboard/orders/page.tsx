@@ -48,7 +48,7 @@ export default function OrdersPage() {
     <div className="max-w-4xl">
       <h1 className="text-xl font-semibold text-foreground">Orders</h1>
       <p className="mt-1 text-sm text-muted">
-        Everything a customer is being asked to pay for (FR17, FR19).
+        Everything a customer is being asked to pay for.
       </p>
 
       <div className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-4">

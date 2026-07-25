@@ -29,10 +29,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="flex w-56 flex-col border-r border-border bg-surface">
         <div className="border-b border-border px-5 py-5">
           <p className="font-mono text-[11px] tracking-widest text-muted uppercase">
-            Payment
-          </p>
-          <p className="font-mono text-[11px] tracking-widest text-muted uppercase">
-            Orchestrator
+            FlowPay
           </p>
         </div>
 

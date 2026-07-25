@@ -1,4 +1,4 @@
-// Payment Orchestrator — Prisma Schema
+// FlowPay — Prisma Schema
 // Full ERD defined now per Phase 0 §4, even though Phase 1 only uses
 // Merchant, MerchantSettings, and ApiKey. Remaining models exist so
 // later phases add logic, not migrations.

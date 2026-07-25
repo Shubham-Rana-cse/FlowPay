@@ -67,7 +67,7 @@ export default function PaymentsPage() {
     <div className="max-w-5xl">
       <h1 className="text-xl font-semibold text-foreground">Payments</h1>
       <p className="mt-1 text-sm text-muted">
-        Every payment attempt, with its full event and ledger history (FR17, FR19).
+        Every payment attempt, with its full event and ledger history.
       </p>
 
       <div className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-4">

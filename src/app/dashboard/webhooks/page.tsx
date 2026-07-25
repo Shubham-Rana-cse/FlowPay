@@ -54,7 +54,7 @@ export default function WebhooksPage() {
     <div className="max-w-4xl">
       <h1 className="text-xl font-semibold text-foreground">Webhooks</h1>
       <p className="mt-1 text-sm text-muted">
-        Recent business events and their delivery attempts to your webhook URL (FR15). Configure
+        Recent business events and their delivery attempts to your webhook URL. Configure
         the URL under Settings.
       </p>
 

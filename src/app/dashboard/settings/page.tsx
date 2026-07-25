@@ -66,7 +66,7 @@ export default function SettingsPage() {
     <div className="max-w-2xl">
       <h1 className="text-xl font-semibold text-foreground">Settings</h1>
       <p className="mt-1 text-sm text-muted">
-        Account-level configuration (FR4, FR4a) — auto-capture, default currency, timezone, and
+        Account-level configuration — auto-capture, default currency, timezone, and
         your webhook endpoint.
       </p>
 
@@ -89,7 +89,7 @@ export default function SettingsPage() {
           <div>
             <p className="text-sm font-medium text-foreground">Auto-capture</p>
             <p className="text-xs text-muted">
-              Capture a payment immediately after it&apos;s authorized (FR4a).
+              Capture a payment immediately after it&apos;s authorized.
             </p>
           </div>
           <button
@@ -135,14 +135,14 @@ export default function SettingsPage() {
           <label className="block text-sm text-muted">Webhook URL</label>
           <input
             type="url"
-            placeholder="https://your-app.example.com/webhooks/payment-orchestrator"
+            placeholder="https://your-app.example.com/webhooks/flowpay"
             value={settings.webhookUrl ?? ""}
             onChange={(e) => setSettings({ ...settings, webhookUrl: e.target.value })}
             className="w-full rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
           />
           <p className="text-xs text-muted">
             payment.captured, payment.failed, refund.completed, and settlement.completed are
-            POSTed here, signed with the secret below (FR15).
+            POSTed here, signed with the secret below.
           </p>
         </div>
 

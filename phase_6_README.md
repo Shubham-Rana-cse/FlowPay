@@ -1,4 +1,4 @@
-# Payment Orchestrator — Phase 6: Retry, Redelivery & Settlement Polling
+# FlowPay — Phase 6: Retry, Redelivery & Settlement Polling
 
 Phase 1 (foundation), Phase 2 (Orders/Payments/idempotency), Phase 3 (Mock
 Bank, real authorization + capture), Phase 4 (refunds, ledger, settlement

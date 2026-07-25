@@ -1,4 +1,4 @@
-# Payment Orchestrator — Phase 5: Merchant Dashboard
+# FlowPay — Phase 5: Merchant Dashboard
 
 Phase 1 (foundation), Phase 2 (Orders/Payments/idempotency), Phase 3 (Mock
 Bank, Provider Adapter pattern, real authorization + capture), and Phase 4
