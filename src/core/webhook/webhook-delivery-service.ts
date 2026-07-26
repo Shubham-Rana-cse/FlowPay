@@ -236,52 +236,52 @@ export type WebhookRetryPollResult = {
   return result;
 } */
 
-export async function pollDueWebhookDeliveries(now: Date = new Date()): Promise<WebhookRetryPollResult> {
-  // Get latest delivery for every webhook event
-  const latestDeliveries = await prisma.webhookDelivery.findMany({
-    orderBy: [
-      { webhookEventId: "asc" },
-      { createdAt: "desc" },
-    ],
+  export async function pollDueWebhookDeliveries(now: Date = new Date()): Promise<WebhookRetryPollResult> {
+  const events = await prisma.webhookEvent.findMany({
+    take: POLL_BATCH_SIZE,
+    orderBy: {
+      createdAt: "asc",
+    },
+    include: {
+      deliveries: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
   });
 
-  // Keep only the newest delivery row for each event
-  const latestPerEvent = new Map<string, typeof latestDeliveries[number]>();
+  const dueEvents = events.filter((event) => {
+    const latest = event.deliveries[0];
 
-  for (const delivery of latestDeliveries) {
-    if (!latestPerEvent.has(delivery.webhookEventId)) {
-      latestPerEvent.set(delivery.webhookEventId, delivery);
-    }
-  }
-
-  const due = [...latestPerEvent.values()].filter(
-    (d) =>
-      d.status === WebhookDeliveryStatus.RETRYING &&
-      d.nextRetryAt !== null &&
-      d.nextRetryAt <= now
-  );
+    return (
+      latest &&
+      latest.status === WebhookDeliveryStatus.RETRYING &&
+      latest.nextRetryAt !== null &&
+      latest.nextRetryAt <= now
+    );
+  });
 
   const result: WebhookRetryPollResult = {
-    scanned: due.length,
+    scanned: dueEvents.length,
     delivered: 0,
     stillFailing: 0,
   };
 
-  for (const delivery of due) {
+  for (const event of dueEvents) {
     try {
       const beforeCount = await prisma.webhookDelivery.count({
-        where: { webhookEventId: delivery.webhookEventId },
+        where: { webhookEventId: event.id },
       });
 
-      await attemptDelivery(delivery.webhookEventId);
+      await attemptDelivery(event.id);
 
       const afterCount = await prisma.webhookDelivery.count({
-        where: { webhookEventId: delivery.webhookEventId },
+        where: { webhookEventId: event.id },
       });
 
       if (afterCount > beforeCount) {
         const latest = await prisma.webhookDelivery.findFirst({
-          where: { webhookEventId: delivery.webhookEventId },
+          where: { webhookEventId: event.id },
           orderBy: { createdAt: "desc" },
         });
 
@@ -293,7 +293,7 @@ export async function pollDueWebhookDeliveries(now: Date = new Date()): Promise<
       }
     } catch (err) {
       logger.error("Webhook retry poll failed for one event", {
-        webhookEventId: delivery.webhookEventId,
+        webhookEventId: event.id,
         error: (err as Error).message,
       });
     }
