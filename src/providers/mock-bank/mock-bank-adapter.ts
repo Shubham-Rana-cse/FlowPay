@@ -82,10 +82,48 @@ export class MockBankAdapter implements ProviderAdapter {
     return { success: true, status: "refunded", providerRef };
   }
 
-  async checkStatus(providerRef: string): Promise<AttemptResult> {
+  /* async checkStatus(providerRef: string): Promise<AttemptResult> {
     await simulatedNetworkDelay();
     // Reserved for Phase 6's polling retry job: after a timeout, ask the bank
     // what actually happened instead of blindly re-authorizing.
     return { success: true, status: "authorized", providerRef };
+  } */
+ 
+  async checkStatus(providerRef: string): Promise<AttemptResult> {
+    await simulatedNetworkDelay();
+
+    // Simulate what the provider reports when we check the payment later.
+    // This intentionally differs from authorize():
+    // authorize() uses deterministic "magic amounts" for testing,
+    // while checkStatus() simulates the real uncertainty after a transient error.
+
+    const roll = Math.random();
+
+    // 70% -> Payment actually succeeded.
+    if (roll < 0.70) {
+      return {
+        success: true,
+        status: "authorized",
+        providerRef: providerRef || `mockbank_${randomUUID()}`,
+      };
+    }
+
+    // 20% -> Still a transient problem, retry again later.
+    if (roll < 0.90) {
+      const timeout = Math.random() < 0.5;
+
+      return {
+        success: false,
+        status: timeout ? "timeout" : "network_error",
+        errorCode: timeout ? "PROVIDER_TIMEOUT" : "NETWORK_ERROR",
+      };
+    }
+
+    // 10% -> Provider finally confirms the payment failed permanently.
+    return {
+      success: false,
+      status: "failed",
+      errorCode: "PROVIDER_DECLINED",
+    };
   }
 }
