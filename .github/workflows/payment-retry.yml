@@ -1,0 +1,18 @@
+name: Payment Retry Cron
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+
+  workflow_dispatch:
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call payment retry endpoint
+        run: |
+          curl -X GET \
+          -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+          https://flowpay-payment-orchestrator.vercel.app/api/internal/cron/payment-retry
