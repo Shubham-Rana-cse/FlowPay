@@ -302,27 +302,3 @@ demand.
   their effects.
 - No Vercel deployment — deploy last, once everything above is stable
   locally (per Phase 1 decisions).
-
-## Known sandbox limitations (not project bugs)
-
-- The sandbox *did* have npm registry access for Phase 6: `npm install`,
-  `npm run lint`, and `npm run test` were all run and pass (68/68 tests —
-  the 59 from Phase 1-5 plus 6 new ones covering `retry-rules.ts`'s backoff
-  schedule and exhaustion policy, plus 3 new state-machine tests for
-  Phase 6's added transitions). `tsc --noEmit` and `npm run build` fail in
-  exactly the same way as every prior phase's schema addition (Phase 4's
-  `Settlement`, Phase 5's `webhookUrl`): the committed
-  `src/generated/prisma/*` client predates this phase's schema change
-  (`Payment.retryCount`/`nextRetryAt`) — on top of already being a stale
-  Windows binary in a Linux sandbox — so every reference to those two
-  fields (in `payment-service.ts` and `retry-service.ts`) fails to
-  type-check until you run `npx prisma generate` (step 3) and `npx prisma
-  migrate dev` (step 4) locally, exactly as documented in every prior
-  phase's README.
-- `binaries.prisma.sh` still wasn't reachable from this sandbox, so
-  `prisma generate` / `migrate` / `validate` still need to be run locally.
-- `npm run test` prints the same one benign error as Phase 5 (not a failing
-  test — all 68 pass), from `webhook-delivery-service.test.ts` importing
-  the `prisma` singleton, which tries to load the committed Windows
-  query-engine binary on this Linux sandbox. Identical root cause to every
-  prior phase's Prisma-binary limitation, not a Phase 6 regression.
