@@ -119,7 +119,12 @@ export async function createSettlement(merchantId: string, currency: string) {
     }
 
     return created;
-  });
+  },
+  {
+    maxWait: 10000,   // wait up to 10s to acquire a connection
+    timeout: 30000,   // allow transaction to run for 30s
+  }
+);
 
   // FR15 — dispatched after the transaction commits, same reasoning as
   // payment-service.ts / refund-service.ts.
