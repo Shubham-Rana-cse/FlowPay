@@ -135,7 +135,35 @@ exports.Prisma.MerchantSettingsScalarFieldEnum = {
   defaultCurrency: 'defaultCurrency',
   webhookSecret: 'webhookSecret',
   webhookUrl: 'webhookUrl',
-  timezone: 'timezone'
+  timezone: 'timezone',
+  routingStrategy: 'routingStrategy',
+  preferredProvider: 'preferredProvider',
+  failoverEnabled: 'failoverEnabled'
+};
+
+exports.Prisma.ProviderConfigScalarFieldEnum = {
+  id: 'id',
+  merchantId: 'merchantId',
+  provider: 'provider',
+  enabled: 'enabled',
+  priority: 'priority',
+  costBps: 'costBps',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.RoutingRuleScalarFieldEnum = {
+  id: 'id',
+  merchantId: 'merchantId',
+  name: 'name',
+  priority: 'priority',
+  enabled: 'enabled',
+  currency: 'currency',
+  minAmount: 'minAmount',
+  maxAmount: 'maxAmount',
+  provider: 'provider',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.ApiKeyScalarFieldEnum = {
@@ -241,6 +269,23 @@ exports.Prisma.WebhookDeliveryScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.CheckoutSessionScalarFieldEnum = {
+  id: 'id',
+  merchantId: 'merchantId',
+  orderId: 'orderId',
+  amount: 'amount',
+  currency: 'currency',
+  paymentId: 'paymentId',
+  providerChosen: 'providerChosen',
+  paymentMethod: 'paymentMethod',
+  status: 'status',
+  attemptCount: 'attemptCount',
+  returnUrl: 'returnUrl',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -270,6 +315,15 @@ exports.Prisma.JsonNullValueFilter = {
   JsonNull: Prisma.JsonNull,
   AnyNull: Prisma.AnyNull
 };
+exports.RoutingStrategyType = exports.$Enums.RoutingStrategyType = {
+  FIXED: 'FIXED',
+  ROUND_ROBIN: 'ROUND_ROBIN',
+  CHEAPEST: 'CHEAPEST',
+  HIGHEST_SUCCESS_RATE: 'HIGHEST_SUCCESS_RATE',
+  MERCHANT_PREFERRED: 'MERCHANT_PREFERRED',
+  RULE_BASED: 'RULE_BASED'
+};
+
 exports.OrderStatus = exports.$Enums.OrderStatus = {
   CREATED: 'CREATED',
   PAID: 'PAID',
@@ -308,9 +362,18 @@ exports.WebhookDeliveryStatus = exports.$Enums.WebhookDeliveryStatus = {
   RETRYING: 'RETRYING'
 };
 
+exports.CheckoutSessionStatus = exports.$Enums.CheckoutSessionStatus = {
+  OPEN: 'OPEN',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  EXPIRED: 'EXPIRED'
+};
+
 exports.Prisma.ModelName = {
   Merchant: 'Merchant',
   MerchantSettings: 'MerchantSettings',
+  ProviderConfig: 'ProviderConfig',
+  RoutingRule: 'RoutingRule',
   ApiKey: 'ApiKey',
   Order: 'Order',
   Payment: 'Payment',
@@ -320,7 +383,8 @@ exports.Prisma.ModelName = {
   Refund: 'Refund',
   Settlement: 'Settlement',
   WebhookEvent: 'WebhookEvent',
-  WebhookDelivery: 'WebhookDelivery'
+  WebhookDelivery: 'WebhookDelivery',
+  CheckoutSession: 'CheckoutSession'
 };
 
 /**

@@ -53,6 +53,57 @@ export const updateSettingsSchema = z.object({
   webhookUrl: z
     .union([z.string().url("webhookUrl must be a valid URL"), z.literal("")])
     .optional(),
+  // Phase 7 — Dynamic Routing Engine / Automatic Failover configuration.
+  routingStrategy: z
+    .enum(["FIXED", "ROUND_ROBIN", "CHEAPEST", "HIGHEST_SUCCESS_RATE", "MERCHANT_PREFERRED", "RULE_BASED"])
+    .optional(),
+  // Empty string clears a previously-configured preference.
+  preferredProvider: z.union([z.string().min(1).max(50), z.literal("")]).optional(),
+  failoverEnabled: z.boolean().optional(),
+});
+
+// Phase 7 — Dynamic Routing Engine (FR9/FR21): provider switching + rules.
+
+export const upsertProviderConfigSchema = z.object({
+  provider: z.string().min(1).max(50),
+  enabled: z.boolean().optional(),
+  priority: z.number().int().min(0).max(10000).optional(),
+  costBps: z.number().int().min(0).max(10000).optional(),
+});
+
+export const createRoutingRuleSchema = z.object({
+  name: z.string().min(1).max(100),
+  provider: z.string().min(1).max(50),
+  priority: z.number().int().min(0).max(10000).optional(),
+  enabled: z.boolean().optional(),
+  currency: z.enum(SUPPORTED_CURRENCIES).optional(),
+  minAmount: z.number().int().nonnegative().optional(),
+  maxAmount: z.number().int().nonnegative().optional(),
+});
+
+export const updateRoutingRuleSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  provider: z.string().min(1).max(50).optional(),
+  priority: z.number().int().min(0).max(10000).optional(),
+  enabled: z.boolean().optional(),
+  // null clears the condition; omit the field to leave it untouched.
+  currency: z.union([z.enum(SUPPORTED_CURRENCIES), z.null()]).optional(),
+  minAmount: z.union([z.number().int().nonnegative(), z.null()]).optional(),
+  maxAmount: z.union([z.number().int().nonnegative(), z.null()]).optional(),
+});
+
+// Phase 8 — Hosted Checkout.
+
+export const createCheckoutSessionSchema = z.object({
+  order_id: z.string().min(1, "order_id is required"),
+  return_url: z.string().url("return_url must be a valid URL"),
+  // Defaults to 30 minutes (see checkout-session-service.ts); merchants
+  // can shorten/extend within a sane range.
+  expires_in_seconds: z.number().int().min(60).max(3600).optional(),
+});
+
+export const submitCheckoutPaymentSchema = z.object({
+  method: z.enum(["card", "upi", "netbanking"]),
 });
 
 // Phase 5 — Dashboard list/search filters (FR17-FR19). All optional; an

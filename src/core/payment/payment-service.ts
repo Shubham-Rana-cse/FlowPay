@@ -28,8 +28,10 @@ import {
   IdempotencyKeyConflictError,
 } from "./idempotency";
 import { assertTransition } from "./state-machine";
-import { selectProvider } from "@/core/routing/routing-service";
+import { selectProviderChain, getAdapter } from "@/core/routing/routing-service";
+import { isFailoverEligible } from "@/core/routing/failover-policy";
 import { TRANSIENT_MOCK_BANK_STATUSES } from "@/providers/mock-bank/mock-bank-adapter";
+import { TRANSIENT_PROVIDER_STATUSES } from "@/providers/scenario-buckets";
 import { getMerchantSettings } from "@/core/merchant/merchant-service";
 import { appendLedgerEntry } from "@/core/ledger/ledger-service";
 import { dispatchWebhookEvent } from "@/core/webhook/webhook-event-service";
@@ -220,52 +222,108 @@ async function runAuthorizationPipeline(
     });
 
     const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
-    const { providerName, adapter } = selectProvider({
+
+    // Phase 7 — Dynamic Routing Engine: an ordered chain of candidate
+    // providers instead of a single pick. For a merchant who hasn't
+    // configured Phase 7 routing (no ProviderConfig rows), this resolves
+    // to the exact same one-element `[mock-bank]` chain `selectProvider()`
+    // always returned, so nothing changes for them.
+    const chain = await selectProviderChain({
       id: payment.id,
       amount: payment.amount,
       currency: payment.currency,
+      merchantId,
     });
 
+    let providerName = chain[0].providerName;
     await prisma.$transaction(async (tx) => {
       await tx.payment.update({ where: { id: paymentId }, data: { provider: providerName } });
-      await recordEvent(tx, paymentId, PaymentEventType.PROVIDER_SELECTED, { provider: providerName });
+      await recordEvent(tx, paymentId, PaymentEventType.PROVIDER_SELECTED, {
+        provider: providerName,
+        chain: chain.map((c) => c.providerName),
+      });
     });
 
     let attemptNumber = 0;
-    let result: AttemptResult;
+    let result: AttemptResult | undefined;
 
-    do {
-      attemptNumber += 1;
-      await prisma.paymentEvent.create({
-        data: {
-          paymentId,
-          eventType: PaymentEventType.AUTHORIZATION_STARTED,
-          metadata: { attemptNumber, provider: providerName },
-        },
-      });
+    // Outer loop: Automatic Provider Failover across the chain. Inner loop:
+    // the original Phase 3 bounded, same-provider retry (3 attempts,
+    // 50/100/200ms backoff) — unchanged in shape, just scoped to whichever
+    // provider is currently being tried.
+    for (let chainIndex = 0; chainIndex < chain.length; chainIndex += 1) {
+      const { providerName: currentProvider, adapter } = chain[chainIndex];
+      providerName = currentProvider;
 
-      result = await adapter.authorize({
-        id: payment.id,
-        amount: payment.amount,
-        currency: payment.currency,
-      });
+      if (chainIndex > 0) {
+        // Moving to the next provider in the chain because the previous
+        // one looked like an outage (failover-policy.ts) — record it on
+        // the Payment row and the timeline before trying again, so the
+        // audit trail (PaymentEvent + PaymentAttempt) tells the whole
+        // multi-provider story, not just the final outcome.
+        await prisma.$transaction(async (tx) => {
+          await tx.payment.update({ where: { id: paymentId }, data: { provider: providerName } });
+          await recordEvent(tx, paymentId, PaymentEventType.PROVIDER_FAILOVER, {
+            from: chain[chainIndex - 1].providerName,
+            to: providerName,
+            reason: result?.status,
+          });
+        });
+      }
 
-      await prisma.paymentAttempt.create({
-        data: {
-          paymentId,
-          provider: providerName,
-          status: result.status,
-          attemptNumber,
-          providerRef: result.providerRef,
-          errorCode: result.errorCode,
-        },
-      });
+      let attemptForThisProvider = 0;
+
+      do {
+        attemptNumber += 1;
+        attemptForThisProvider += 1;
+        await prisma.paymentEvent.create({
+          data: {
+            paymentId,
+            eventType: PaymentEventType.AUTHORIZATION_STARTED,
+            metadata: { attemptNumber, provider: providerName },
+          },
+        });
+
+        result = await adapter.authorize({
+          id: payment.id,
+          amount: payment.amount,
+          currency: payment.currency,
+        });
+
+        await prisma.paymentAttempt.create({
+          data: {
+            paymentId,
+            provider: providerName,
+            status: result.status,
+            attemptNumber,
+            providerRef: result.providerRef,
+            errorCode: result.errorCode,
+          },
+        });
+
+        if (result.success) break;
+        const transient =
+          TRANSIENT_MOCK_BANK_STATUSES.has(result.status) || TRANSIENT_PROVIDER_STATUSES.has(result.status);
+        if (!transient || attemptForThisProvider >= MAX_AUTHORIZE_ATTEMPTS) break;
+        await sleep(backoffMs(attemptForThisProvider));
+      } while (true);
 
       if (result.success) break;
-      const transient = TRANSIENT_MOCK_BANK_STATUSES.has(result.status);
-      if (!transient || attemptNumber >= MAX_AUTHORIZE_ATTEMPTS) break;
-      await sleep(backoffMs(attemptNumber));
-    } while (true);
+
+      // Same-provider retries are exhausted (or the failure was a hard
+      // decline, never retryable). Move to the next provider in the chain
+      // only if this outcome looks like a provider-level problem, not a
+      // genuine decline that would fail identically anywhere else.
+      const hasNextProvider = chainIndex < chain.length - 1;
+      if (!hasNextProvider || !isFailoverEligible(result.status)) break;
+    }
+
+    if (!result) {
+      // Unreachable in practice — selectProviderChain() always returns at
+      // least one entry — but keeps this function's control flow provably
+      // total rather than relying on that invariant silently.
+      throw new Error("Authorization pipeline produced no attempt result");
+    }
 
     if (result.success) {
       await prisma.$transaction(async (tx) => {
@@ -361,11 +419,12 @@ export async function performCapture(
   providerRef: string | undefined
 ): Promise<void> {
   const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
-  const { adapter } = selectProvider({
-    id: payment.id,
-    amount: payment.amount,
-    currency: payment.currency,
-  });
+  // Phase 7 — must capture against the SAME provider that authorized this
+  // payment (`providerName`, passed in by the caller from `Payment.provider`),
+  // not whatever a fresh routing decision would pick now. With only
+  // mock-bank ever registered (Phase 3-6) this was never observable; it
+  // matters as soon as a second provider exists.
+  const adapter = getAdapter(providerName);
 
   const result = await adapter.capture(
     { id: payment.id, amount: payment.amount, currency: payment.currency },

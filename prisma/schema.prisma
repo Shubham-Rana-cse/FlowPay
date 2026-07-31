@@ -30,6 +30,11 @@ model Merchant {
   orders        Order[]
   webhookEvents WebhookEvent[]
   settlements   Settlement[]
+  // Phase 7 — Dynamic Routing Engine
+  providerConfigs ProviderConfig[]
+  routingRules    RoutingRule[]
+  // Phase 8 — Hosted Checkout
+  checkoutSessions CheckoutSession[]
 
   @@map("merchants")
 }
@@ -46,7 +51,75 @@ model MerchantSettings {
   webhookUrl     String?
   timezone       String   @default("Asia/Kolkata")
 
+  // Phase 7 — FR21: which RoutingStrategy the Dynamic Routing Engine uses
+  // once a merchant has configured at least one ProviderConfig row (zero
+  // rows = unchanged Phase 3-6 behavior: FixedProviderStrategy -> mock-bank).
+  routingStrategy   RoutingStrategyType @default(FIXED)
+  // Used by MERCHANT_PREFERRED and as the tie-break fallback for others.
+  preferredProvider String?
+  // Automatic failover toggle (default on): an outage-shaped provider
+  // failure is retried against the next enabled provider before the
+  // Payment is marked FAILED/TIMEOUT/RETRY.
+  failoverEnabled   Boolean @default(true)
+
   @@map("merchant_settings")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phase 7 addition — Dynamic Routing Engine (FR9, FR20, FR21). Additive
+// only: a merchant with zero ProviderConfig/RoutingRule rows keeps routing
+// exactly like Phase 3-6 (FixedProviderStrategy -> mock-bank). These take
+// effect once a merchant opts in via /api/merchant/providers and
+// /api/merchant/routing-rules (or the Providers dashboard page).
+// ─────────────────────────────────────────────────────────────
+
+enum RoutingStrategyType {
+  FIXED
+  ROUND_ROBIN
+  CHEAPEST
+  HIGHEST_SUCCESS_RATE
+  MERCHANT_PREFERRED
+  RULE_BASED
+}
+
+// Per-merchant, per-provider config: enabled ("provider switching"),
+// priority (tie-break / failover order), and cost (basis points, for
+// CHEAPEST).
+model ProviderConfig {
+  id         String   @id @default(cuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  provider   String // "mock-bank" | "stripe" | "razorpay" | future adapters
+  enabled    Boolean  @default(true)
+  priority   Int      @default(100)
+  costBps    Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([merchantId, provider])
+  @@index([merchantId])
+  @@map("provider_configs")
+}
+
+// Rule-based routing: conditions matched against a payment's
+// currency/amount, evaluated in ascending `priority` order — first enabled
+// match wins. An unset condition field means "don't filter on this".
+model RoutingRule {
+  id         String   @id @default(cuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  name       String
+  priority   Int      @default(100)
+  enabled    Boolean  @default(true)
+  currency   String?
+  minAmount  Int?
+  maxAmount  Int?
+  provider   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([merchantId])
+  @@map("routing_rules")
 }
 
 model ApiKey {
@@ -85,6 +158,11 @@ model Order {
   updatedAt  DateTime    @updatedAt
 
   payments Payment[]
+  // Phase 8 — Hosted Checkout: an Order can have at most one *active*
+  // CheckoutSession at a time in practice, but nothing stops a merchant
+  // from creating a fresh session against the same Order (e.g. the first
+  // one expired unused), so this is a list, same shape as `payments`.
+  checkoutSessions CheckoutSession[]
 
   @@index([merchantId])
   @@map("orders")
@@ -133,6 +211,11 @@ model Payment {
   // leaves TIMEOUT/RETRY for good (AUTHORIZED or FAILED).
   retryCount  Int       @default(0)
   nextRetryAt DateTime?
+
+  // Phase 8 — Hosted Checkout: back-relation for CheckoutSession.paymentId.
+  // A session points at whichever Payment its latest attempt produced; this
+  // is the required opposite side of that relation, not a new concept.
+  checkoutSessions CheckoutSession[]
 
   @@unique([merchantId, idempotencyKey])
   @@index([orderId])
@@ -267,4 +350,72 @@ model WebhookDelivery {
 
   @@index([webhookEventId])
   @@map("webhook_deliveries")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phase 8 addition — Hosted Checkout. Not in the original Phase 0 §4 ERD,
+// same situation as Phase 4's Settlement model: "hosted checkout" wasn't a
+// named deliverable until now, so this is added rather than retrofitted.
+// A CheckoutSession is PayFlow's own branded page in front of an existing
+// Order — the routing engine, provider adapters, idempotency, ledger, and
+// webhooks underneath it are completely unchanged (see checkout-session-
+// service.ts's header comment). The session id itself is the bearer token
+// for the public-facing /checkout/{id} page and its API — nothing about a
+// merchant's account is reachable through it.
+// ─────────────────────────────────────────────────────────────
+
+enum CheckoutSessionStatus {
+  OPEN // created, waiting for the customer to pick a method and pay
+  COMPLETED // underlying Payment reached CAPTURED
+  FAILED // underlying Payment reached a terminal FAILED with no attempts left in this session
+  EXPIRED // expiresAt elapsed while still OPEN
+}
+
+model CheckoutSession {
+  id         String   @id @default(cuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Denormalized from the Order at creation time (same reasoning as
+  // Payment.amount/currency being denormalized from Order) so the hosted
+  // page never needs a second lookup just to render the order summary.
+  amount   Int
+  currency String
+
+  // Set once the customer submits a payment attempt from this session.
+  // Nullable because a session can exist (and expire) with zero attempts.
+  paymentId String?
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+
+  // providerChosen mirrors Payment.provider at the time of the last
+  // attempt — kept here too so the session's own history doesn't require
+  // joining to Payment for the common "what actually processed this"
+  // question. paymentMethod is the customer's UI selection (card/upi/
+  // netbanking); Mock Bank/Stripe/Razorpay don't currently branch on it,
+  // it's recorded for the checkout UI and any future per-method routing.
+  providerChosen String?
+  paymentMethod  String?
+
+  status CheckoutSessionStatus @default(OPEN)
+
+  // FR7-style retries (a failed attempt doesn't kill the session) each get
+  // a fresh idempotency key derived from `${sessionId}:${attemptCount}` —
+  // see checkout-session-service.ts.
+  attemptCount Int @default(0)
+
+  // Where PayFlow redirects the browser once the session reaches a
+  // terminal state (COMPLETED/FAILED) or the customer bails out. Required:
+  // a session created without one has nowhere to send the customer back.
+  returnUrl String
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([merchantId])
+  @@index([orderId])
+  @@index([paymentId])
+  @@map("checkout_sessions")
 }

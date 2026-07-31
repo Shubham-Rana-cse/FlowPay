@@ -16,6 +16,14 @@ export const API_ROUTES = {
   V1_REFUND: (id: string) => `/api/v1/refunds/${id}`,
   V1_SETTLEMENTS: "/api/v1/settlements",
   V1_SETTLEMENT: (id: string) => `/api/v1/settlements/${id}`,
+  // Phase 8 — Hosted Checkout. V1_* is merchant/API-key authed (session
+  // creation); PUBLIC_* takes no auth beyond the session id itself, same
+  // trust model as a Stripe Checkout Session URL.
+  V1_CHECKOUT_SESSIONS: "/api/v1/checkout/sessions",
+  V1_CHECKOUT_SESSION: (id: string) => `/api/v1/checkout/sessions/${id}`,
+  PUBLIC_CHECKOUT_SESSION: (id: string) => `/api/public/checkout/${id}`,
+  PUBLIC_CHECKOUT_PAY: (id: string) => `/api/public/checkout/${id}/pay`,
+  PUBLIC_CHECKOUT_RETRY: (id: string) => `/api/public/checkout/${id}/retry`,
   // Phase 5 — merchant dashboard reads (FR17-FR19) and settings (FR4)
   MERCHANT_ORDERS: "/api/merchant/orders",
   MERCHANT_PAYMENTS: "/api/merchant/payments",
@@ -36,4 +44,11 @@ export const DASHBOARD_ROUTES = {
   PROFILE: "/dashboard/profile",
   LOGIN: "/login",
   REGISTER: "/register",
+} as const;
+
+// Phase 8 — the hosted, customer-facing checkout page. Deliberately not
+// under DASHBOARD_ROUTES: it has no sidebar, no JWT, and isn't part of the
+// merchant dashboard's route tree.
+export const CHECKOUT_ROUTES = {
+  SESSION: (id: string) => `/checkout/${id}`,
 } as const;

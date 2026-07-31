@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/payments", label: "Payments" },
   { href: "/dashboard/analytics", label: "Analytics" },
   { href: "/dashboard/webhooks", label: "Webhooks" },
+  { href: "/dashboard/providers", label: "Providers" },
   { href: "/dashboard/api-keys", label: "API keys" },
   { href: "/dashboard/settings", label: "Settings" },
   { href: "/dashboard/profile", label: "Profile" },

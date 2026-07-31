@@ -38,6 +38,25 @@ export const SettlementStatus = {
 } as const;
 export type SettlementStatus = (typeof SettlementStatus)[keyof typeof SettlementStatus];
 
+// Phase 8 — Hosted Checkout. Not part of the original Phase 0 ERD; see
+// CheckoutSession's own schema comment for why it was added now.
+export const CheckoutSessionStatus = {
+  OPEN: "OPEN",
+  COMPLETED: "COMPLETED",
+  FAILED: "FAILED",
+  EXPIRED: "EXPIRED",
+} as const;
+export type CheckoutSessionStatus =
+  (typeof CheckoutSessionStatus)[keyof typeof CheckoutSessionStatus];
+
+export const CheckoutPaymentMethod = {
+  CARD: "card",
+  UPI: "upi",
+  NETBANKING: "netbanking",
+} as const;
+export type CheckoutPaymentMethod =
+  (typeof CheckoutPaymentMethod)[keyof typeof CheckoutPaymentMethod];
+
 export const WebhookDeliveryStatus = {
   PENDING: "PENDING",
   DELIVERED: "DELIVERED",
@@ -76,5 +95,9 @@ export const PaymentEventType = {
   // "failed" (a hard decline resolved within the original request).
   RETRY_ATTEMPTED: "retry_attempted",
   RETRY_EXHAUSTED: "retry_exhausted",
+  // Phase 7 — Automatic Provider Failover: a provider's outcome looked like
+  // an outage (failover-policy.ts) and the pipeline moved on to the next
+  // provider in the Dynamic Routing Engine's chain, within the same request.
+  PROVIDER_FAILOVER: "provider_failover",
 } as const;
 export type PaymentEventType = (typeof PaymentEventType)[keyof typeof PaymentEventType];

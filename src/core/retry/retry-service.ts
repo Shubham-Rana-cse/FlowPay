@@ -28,7 +28,7 @@
 import { prisma } from "@/lib/db";
 import { PaymentStatus, PaymentEventType, WebhookEventType } from "@/constants/status";
 import { recordEvent, transitionPayment, performCapture } from "@/core/payment/payment-service";
-import { selectProvider } from "@/core/routing/routing-service";
+import { getAdapter } from "@/core/routing/routing-service";
 import { TRANSIENT_MOCK_BANK_STATUSES } from "@/providers/mock-bank/mock-bank-adapter";
 import { getMerchantSettings } from "@/core/merchant/merchant-service";
 import { dispatchWebhookEvent } from "@/core/webhook/webhook-event-service";
@@ -87,11 +87,14 @@ export async function pollPaymentRetries(now: Date = new Date()): Promise<Paymen
 
 async function processDuePayment(payment: Payment, result: PaymentRetryPollResult): Promise<void> {
   const from = payment.status as PaymentStatus;
-  const { providerName, adapter } = selectProvider({
-    id: payment.id,
-    amount: payment.amount,
-    currency: payment.currency,
-  });
+  // Phase 7 — check status against whichever provider this payment was
+  // actually last routed to (`Payment.provider`, set by the authorization
+  // pipeline's Dynamic Routing Engine / failover chain), not a fresh
+  // routing decision. Prior to Phase 7 only mock-bank was ever registered,
+  // so this was a no-op difference; it matters as soon as a second
+  // provider exists.
+  const providerName = payment.provider ?? "mock-bank";
+  const adapter = getAdapter(providerName);
 
   const priorAttempts = await prisma.paymentAttempt.count({ where: { paymentId: payment.id } });
   const attemptNumber = priorAttempts + 1;

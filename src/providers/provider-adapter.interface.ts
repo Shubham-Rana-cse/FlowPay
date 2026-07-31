@@ -16,6 +16,13 @@ export interface ProviderPaymentInput {
   id: string;
   amount: number; // minor units
   currency: string;
+  // Phase 7 — optional so every existing call site/test that builds a
+  // ProviderPaymentInput without it keeps compiling and behaving exactly
+  // as before. Only the Dynamic Routing Engine (routing-service.ts's
+  // selectProviderChain) reads this, to load a merchant's ProviderConfig/
+  // RoutingRule rows; the legacy selectProvider()/FixedProviderStrategy
+  // path never looks at it.
+  merchantId?: string;
 }
 
 export interface AttemptResult {

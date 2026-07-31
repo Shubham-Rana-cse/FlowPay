@@ -99,6 +99,10 @@ export async function updateMerchantSettings(
     defaultCurrency?: string;
     timezone?: string;
     webhookUrl?: string;
+    // Phase 7 — Dynamic Routing Engine / Automatic Failover configuration.
+    routingStrategy?: "FIXED" | "ROUND_ROBIN" | "CHEAPEST" | "HIGHEST_SUCCESS_RATE" | "MERCHANT_PREFERRED" | "RULE_BASED";
+    preferredProvider?: string;
+    failoverEnabled?: boolean;
   }
 ) {
   const existing = await prisma.merchantSettings.findUnique({ where: { merchantId } });
@@ -113,6 +117,11 @@ export async function updateMerchantSettings(
       ...(input.webhookUrl !== undefined
         ? { webhookUrl: input.webhookUrl === "" ? null : input.webhookUrl }
         : {}),
+      ...(input.routingStrategy !== undefined ? { routingStrategy: input.routingStrategy } : {}),
+      ...(input.preferredProvider !== undefined
+        ? { preferredProvider: input.preferredProvider === "" ? null : input.preferredProvider }
+        : {}),
+      ...(input.failoverEnabled !== undefined ? { failoverEnabled: input.failoverEnabled } : {}),
     },
   });
 }
