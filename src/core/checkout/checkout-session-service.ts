@@ -90,10 +90,10 @@ function serializeSession(session: CheckoutSession) {
     provider_chosen: session.providerChosen,
     payment_method: session.paymentMethod,
     attempt_count: session.attemptCount,
-    expires_at: session.expiresAt,
+    expires_at: session.expiresAt.toISOString(),
     return_url: session.returnUrl,
-    created_at: session.createdAt,
-    updated_at: session.updatedAt,
+    created_at: session.createdAt.toISOString(),
+    updated_at: session.updatedAt.toISOString(),
   };
 }
 
